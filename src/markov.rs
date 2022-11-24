@@ -140,8 +140,6 @@ impl Model {
         self.touch_word(last);
 
         self.count_start_occurrence(first);
-        // since we miss this in the loop:
-        self.count_occurrence(first);
 
         self.count_end_occurrence(last);
 
@@ -150,7 +148,6 @@ impl Model {
             let (w1, w2) = (words[i - 1], words[i]);
             self.touch_word(w2);
             self.count_pair(w1, w2);
-            self.count_occurrence(w2);
         }
     }
 
@@ -236,11 +233,5 @@ impl Model {
         let (_, stats) = self.get_stats_mut(w1).unwrap();
         stats.next_occurrences[w2_idx] += 1;
         stats.next_total += 1;
-    }
-
-    /// add a single occurrance to a word, used for ending words
-    fn count_occurrence(&mut self, word: &str) -> () {
-        let (_, stats) = self.get_stats_mut(word).unwrap();
-        stats.occurrences += 1;
     }
 }
