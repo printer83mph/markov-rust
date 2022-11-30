@@ -1,17 +1,12 @@
+use rand::prelude::random;
 use std::{
     collections::{HashMap, HashSet},
     io::BufRead,
 };
 
-use rand::prelude::random;
+mod serialize;
 
-// TODO: use this babey
-enum Capitalization {
-    Ignore,
-    Match,
-    Capitalize,
-}
-
+#[derive(Debug, Clone)]
 pub struct Config {
     paragraph_delimiter: char,
     word_delimiters: HashSet<char>,
@@ -20,12 +15,13 @@ pub struct Config {
 impl Config {
     pub fn prose() -> Config {
         Config {
-            paragraph_delimiter: '\n',
-            word_delimiters: HashSet::from([' ', '\t']),
+            paragraph_delimiter: '\n'.to_owned(),
+            word_delimiters: HashSet::from([' '.to_owned(), '\t'.to_owned()]),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 struct WordStats {
     word: String,
     occurrences: i32,
@@ -78,6 +74,8 @@ fn pick_random(probabilities: &Vec<f64>) -> usize {
 }
 
 /// Markov chain model. Contains known words, and stats connecting them.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(from = "serialize::Model", into = "serialize::Model")]
 pub struct Model {
     config: Config,
     words: HashMap<String, usize>,
@@ -109,7 +107,10 @@ impl Model {
         let mut bytes: Vec<u8> = Vec::new();
 
         // iterate over paragraphs
-        while let Ok(_) = reader.read_until(self.config.paragraph_delimiter as u8, &mut bytes) {
+        while let Ok(bi) = reader.read_until(self.config.paragraph_delimiter as u8, &mut bytes) {
+            if bi == 0 {
+                break;
+            }
             if bytes.is_empty() {
                 continue;
             }
@@ -119,6 +120,30 @@ impl Model {
 
             // do training LOL
             self.train_paragraph(&full_paragraph)
+        }
+    }
+
+    pub fn train_string(&mut self, content: &str) -> () {
+        let mut buffer: String = String::new();
+
+        for ch in content.chars() {
+            if ch == self.config.paragraph_delimiter {
+                // train paragraph if anything in buffer
+                if buffer.len() > 0 {
+                    self.train_paragraph(&buffer);
+                }
+
+                // clear buffer no matter what
+                buffer.clear();
+            } else {
+                // add current char to buffer
+                buffer.push(ch);
+            }
+        }
+
+        // train final paragraph
+        if buffer.len() > 0 {
+            self.train_paragraph(&buffer);
         }
     }
 
