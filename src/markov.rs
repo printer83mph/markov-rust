@@ -108,10 +108,22 @@ impl Model {
 
         // iterate over paragraphs
         while let Ok(bi) = reader.read_until(self.config.paragraph_delimiter as u8, &mut bytes) {
+            // break if we have no more bytes to read
             if bi == 0 {
                 break;
             }
-            if bytes.is_empty() {
+
+            // remove paragraph delimiter
+            bytes.pop();
+
+            // continue if we only have one byte
+            // TODO: there has to be a better way to do this...
+            if bytes
+                .iter()
+                .filter(|c| !self.config.word_delimiters.contains(&((**c) as char)))
+                .count()
+                == 0
+            {
                 continue;
             }
 
@@ -119,7 +131,9 @@ impl Model {
             let full_paragraph: String = bytes.iter().map(|b| *b as char).collect();
 
             // do training LOL
-            self.train_paragraph(&full_paragraph)
+            self.train_paragraph(&full_paragraph);
+
+            bytes.clear();
         }
     }
 
@@ -151,7 +165,7 @@ impl Model {
         // split string into words, filter whitespace
         let words: Vec<&str> = paragraph
             .split(|c| self.config.word_delimiters.contains(&c))
-            .filter(|&w| w != "")
+            .filter(|&w| w.len() > 0)
             .collect();
 
         if words.is_empty() {

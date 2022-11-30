@@ -17,6 +17,9 @@ enum Action {
     Generate {
         model_file: std::path::PathBuf,
         out_file: std::path::PathBuf,
+
+        #[arg(short, long, default_value_t = 10)]
+        count: u32,
     },
 }
 
@@ -56,7 +59,7 @@ fn main() -> std::io::Result<()> {
                 if !model_exists || reset {
                     Model::new_prose()
                 } else {
-                    // TODO: should i borrow this??
+                    // TODO: should i borrow prev_model??
                     serde_json::from_reader(&prev_model.unwrap()).expect("Invalid model file")
                 }
             };
@@ -79,6 +82,7 @@ fn main() -> std::io::Result<()> {
 
             // save serialized model
             model_file.write_all(serialized.as_bytes())?;
+            model_file.flush().expect("Error finalizing writing");
             println!("Saved model to {}.", model_file_path.to_str().unwrap());
 
             Ok(())
@@ -86,8 +90,28 @@ fn main() -> std::io::Result<()> {
         Action::Generate {
             model_file,
             out_file,
+            count,
         } => {
-            println!("generating bastard");
+            let source_reader =
+                std::fs::read_to_string(model_file).expect("Unable to read model file");
+            let model: Model =
+                serde_json::from_str(&source_reader[..]).expect("Invalid model file");
+
+            let mut out_file = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(out_file)
+                .expect("Unable to open out file");
+
+            for _ in 0..count {
+                out_file
+                    .write_all(format!("{}\n", model.generate_paragraph()).as_bytes())
+                    .expect("Error writing to file");
+            }
+
+            out_file.flush().expect("Error finalizing writing");
+
             Ok(())
         }
     }
